@@ -1,0 +1,38 @@
+---
+- name: Kopia zapasowa AdGuard Home
+  hosts: agh_zbojak
+  become: true
+
+  vars:
+    backup_server: "Ansible_Zbojak"
+    backup_path: "/backups/adguardhome"
+    date: "{{ lookup('pipe', 'date +%Y-%m-%d') }}"
+
+  tasks:
+
+    - name: Tworzenie katalogu tymczasowego na backup
+      file:
+        path: "/tmp/adguard_backup_{{ date }}"
+        state: directory
+        mode: "0755"
+
+    - name: Kopiowanie konfiguracji AdGuard Home
+      copy:
+        src: "/etc/AdGuardHome/AdGuardHome.yaml"
+        dest: "/tmp/adguard_backup_{{ date }}/AdGuardHome.yaml"
+        remote_src: true
+
+    - name: Archiwizacja danych AdGuard Home
+      archive:
+        path: "/var/lib/AdGuardHome"
+        dest: "/tmp/adguard_backup_{{ date }}/data.tar.gz"
+
+    - name: Wysyłanie backupu na serwer Ansible_{nazwisko}
+      command: >
+        rsync -avz /tmp/adguard_backup_{{ date }}/
+        {{ backup_server }}:{{ backup_path }}/{{ date }}/
+
+    - name: Usuwanie lokalnego katalogu tymczasowego
+      file:
+        path: "/tmp/adguard_backup_{{ date }}"
+        state: absent
