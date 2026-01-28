@@ -1,0 +1,131 @@
+---
+- name: Konfiguracja puli dyskowej, udziału sieciowego i środowiska Windows
+  hosts: windows_server
+  gather_facts: no
+
+  vars:
+    nazwisko: "Zbojak"
+    grupa: "Kierownicy_{{ nazwisko }}"
+    udzial: "Projekty_{{ nazwisko }}"
+    sciezka_udzialu: "F:\\Projekty"
+
+  tasks:
+
+
+    - name: Tworzenie puli dyskowej z dostępnych dysków
+      win_shell: |
+        $disks = Get-PhysicalDisk -CanPool $true
+        if ($disks.Count -lt 4) {
+            Write-Error "Nie znaleziono 4 dysków do utworzenia puli."
+        }
+        New-StoragePool -FriendlyName "Pula_{{ nazwisko }}" `
+                        -StorageSubsystemFriendlyName "Storage Spaces*" `
+                        -PhysicalDisks $disks
+      args:
+        executable: powershell.exe
+
+    - name: Tworzenie tierów SSD i HDD
+      win_shell: |
+        $pool = Get-StoragePool -FriendlyName "Pula_{{ nazwisko }}"
+        $ssd = Get-PhysicalDisk -StoragePoolFriendlyName $pool.FriendlyName | Where-Object MediaType -eq SSD
+        $hdd = Get-PhysicalDisk -StoragePoolFriendlyName $pool.FriendlyName | Where-Object MediaType -eq HDD
+
+        if ($ssd.Count -eq 0 -or $hdd.Count -eq 0) {
+            Write-Error "Brak wymaganych dysków SSD lub HDD do tieringu."
+        }
+
+        New-StorageTier -StoragePoolFriendlyName $pool.FriendlyName -FriendlyName "TierSSD" -MediaType SSD
+        New-StorageTier -StoragePoolFriendlyName $pool.FriendlyName -FriendlyName "TierHDD" -MediaType HDD
+      args:
+        executable: powershell.exe
+
+
+    - name: Tworzenie wirtualnego dysku z mirroringiem i tieringiem
+      win_shell: |
+        $pool = Get-StoragePool -FriendlyName "Pula_{{ nazwisko }}"
+        $ssdTier = Get-StorageTier -StoragePoolFriendlyName $pool.FriendlyName -FriendlyName "TierSSD"
+        $hddTier = Get-StorageTier -StoragePoolFriendlyName $pool.FriendlyName -FriendlyName "TierHDD"
+
+        New-VirtualDisk -StoragePoolFriendlyName $pool.FriendlyName `
+                        -FriendlyName "Dysk_{{ nazwisko }}" `
+                        -StorageTiers @($ssdTier, $hddTier) `
+                        -StorageTierSizes @($ssdTier.Size, $hddTier.Size) `
+                        -ResiliencySettingName Mirror `
+                        -UseMaximumSize
+      args:
+        executable: powershell.exe
+
+    - name: Formatowanie dysku jako ReFS i przypisanie litery F
+      win_shell: |
+        $vd = Get-VirtualDisk -FriendlyName "Dysk_{{ nazwisko }}"
+        $disk = Get-Disk | Where-Object Number -eq $vd.Number
+        $disk | Initialize-Disk -PartitionStyle GPT -PassThru |
+               New-Partition -DriveLetter F -UseMaximumSize |
+               Format-Volume -FileSystem ReFS -NewFileSystemLabel "Dane_{{ nazwisko }}" -Confirm:$false
+      args:
+        executable: powershell.exe
+
+
+    - name: Tworzenie użytkownika Marek Romanek
+      win_user:
+        name: "mromanek"
+        password: "Haslo123!"
+        fullname: "Marek Romanek"
+        state: present
+
+    - name: Tworzenie użytkownika Jacek Gula
+      win_user:
+        name: "jgula"
+        password: "Haslo123!"
+        fullname: "Jacek Gula"
+        state: present
+
+    - name: Tworzenie grupy Kierownicy_{Nazwisko}
+      win_group:
+        name: "{{ grupa }}"
+        state: present
+
+    - name: Dodanie użytkowników do grupy
+      win_group_membership:
+        name: "{{ grupa }}"
+        members:
+          - mromanek
+          - jgula
+        state: present
+
+    - name: Tworzenie katalogu Projekty na dysku F
+      win_file:
+        path: "{{ sciezka_udzialu }}"
+        state: directory
+
+    - name: Udostępnienie katalogu Projekty_{Nazwisko}
+      win_share:
+        name: "{{ udzial }}"
+        path: "{{ sciezka_udzialu }}"
+        full:
+          - "{{ grupa }}"
+          - "Administrators"
+
+
+    - name: Instalacja 7zip
+      win_shell: winget install --id 7zip.7zip -e --accept-source-agreements --accept-package-agreements
+      args:
+        executable: powershell.exe
+
+    - name: Instalacja narzędzia dig (BIND)
+      win_shell: winget install --id ISC.BIND -e --accept-source-agreements --accept-package-agreements
+      args:
+        executable: powershell.exe
+
+    - name: Instalacja Firefox
+      win_shell: winget install --id Mozilla.Firefox -e --accept-source-agreements --accept-package-agreements
+      args:
+        executable: powershell.exe
+
+
+    - name: Blokada usuwania drukarek dla użytkowników nie-adminów
+      win_regedit:
+        path: HKLM:\Software\Policies\Microsoft\Windows NT\Printers
+        name: "RestrictDeletion"
+        data: 1
+        type: dword
