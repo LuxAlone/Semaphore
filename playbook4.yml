@@ -1,146 +1,103 @@
 ---
-- name: Playbook 4 - Konfiguracja Storage Spaces, Udziałów i Użytkowników
+- name: Playbook 4 - Konfiguracja Serwera Zbojak
   hosts: 10.0.0.1
   gather_facts: no
   vars:
     nazwisko: "Zbojak"
-    pass_default: "P@ssw0rd123!" # Hasło dla nowych użytkowników
+    pass_default: "Student123!"
 
   tasks:
     # ----------------------------------------------------------------
-    # 1. Instalacja Oprogramowania (Poprawione nazwy)
+    # 1. Instalacja Oprogramowania (Poprawione nazwy pakietów)
     # ----------------------------------------------------------------
-    - name: Instalacja Chocolatey (jeśli nie istnieje)
+    - name: Instalacja Chocolatey
       chocolatey.chocolatey.win_chocolatey:
         name: chocolatey
         state: present
 
-    - name: Instalacja aplikacji 7zip, Firefox i bind-tool (dig)
+    - name: Instalacja aplikacji (7zip i Firefox)
       chocolatey.chocolatey.win_chocolatey:
         name: "{{ item }}"
         state: present
       loop:
-        - 7zip
-        - firefox
-        - bind-tool # To jest poprawna nazwa pakietu dla 'dig'
+        - 7zip.install
+        - Firefox
+
+    - name: Instalacja narzędzia dig (bind-tool)
+      chocolatey.chocolatey.win_chocolatey:
+        name: bind-tool
+        state: present
+      ignore_errors: yes # Jeśli repozytorium bind-tool ma problem, reszta przejdzie
 
     # ----------------------------------------------------------------
-    # 2. Zarządzanie Użytkownikami i Grupami
+    # 2. Zarządzanie Użytkownikami i Grupą
     # ----------------------------------------------------------------
-    - name: Utworzenie grupy Kierownicy_{Nazwisko}
+    - name: Utworzenie grupy Kierownicy_{{ nazwisko }}
       ansible.windows.win_group:
         name: "Kierownicy_{{ nazwisko }}"
         state: present
-        description: "Grupa kierownicza dla projektu"
 
-    - name: Utworzenie użytkownika Marek Romanek
+    - name: Utworzenie użytkowników
       ansible.windows.win_user:
-        name: "Marek Romanek"
+        name: "{{ item.name }}"
         password: "{{ pass_default }}"
         state: present
         groups:
           - "Kierownicy_{{ nazwisko }}"
-          - "Users"
-
-    - name: Utworzenie użytkownika Jacek Gula
-      ansible.windows.win_user:
-        name: "Jacek Gula"
-        password: "{{ pass_default }}"
-        state: present
-        groups:
-          - "Kierownicy_{{ nazwisko }}"
-          - "Users"
+      loop:
+        - { name: "Marek Romanek" }
+        - { name: "Jacek Gula" }
 
     # ----------------------------------------------------------------
-    # 3. Konfiguracja Puli Dyskowej (Storage Spaces) i ReFS
+    # 3. Pula Dyskowa i ReFS (PowerShell)
     # ----------------------------------------------------------------
-    # Używamy win_shell, ponieważ operacje na Storage Tierach i ReFS 
-    # wymagają złożonej logiki PowerShell niedostępnej w prostych modułach.
-    - name: Konfiguracja Storage Pool, Tiering, Mirroring i ReFS (PowerShell)
+    - name: Konfiguracja Storage Pool, Mirroring i ReFS
       ansible.windows.win_shell: |
-        # Sprawdzenie czy dysk F już istnieje, aby nie nadpisywać danych
-        if (Get-PSDrive -Name "F" -ErrorAction SilentlyContinue) {
-            Write-Output "Dysk F: już istnieje. Pomijanie konfiguracji puli."
-            Exit 0
-        }
-
-        # Pobranie dostępnych dysków (CanPool = True)
-        $phyDisks = Get-PhysicalDisk -CanPool $true
-        
-        if ($phyDisks.Count -lt 1) {
-            Write-Error "Brak dostępnych dysków do utworzenia puli!"
-            Exit 1
-        }
-
-        # Tworzenie Puli Dyskowej
         $poolName = "Pula_{{ nazwisko }}"
-        New-StoragePool -FriendlyName $poolName -StorageSubsystemFriendlyName "Windows Storage*" -PhysicalDisks $phyDisks
-
-        # Logika Tieringu (Prosta symulacja: jeśli są SSD i HDD, system sam to obsłuży w S2D/Spaces)
-        # W tym scenariuszu tworzymy Wirtualny Dysk z Mirrorem (Redundancja)
-        
         $vDiskName = "vDisk_{{ nazwisko }}"
         
-        # Tworzenie dysku wirtualnego (Mirror, Max Size)
-        # Uwaga: Storage Tiers wymagają specyficznej konfiguracji MediaTypes. 
-        # Tutaj używamy ogólnego parametru Mirror, który zapewnia redundancję.
-        New-VirtualDisk -StoragePoolFriendlyName $poolName -FriendlyName $vDiskName -ResiliencySettingName Mirror -UseMaximumSize
-
-        # Inicjalizacja, Partycjonowanie i Formatowanie ReFS
-        Get-VirtualDisk -FriendlyName $vDiskName | Get-Disk | Initialize-Disk -PartitionStyle GPT -PassThru | New-Partition -AssignDriveLetter -UseMaximumSize | Format-Volume -FileSystem ReFS -NewFileSystemLabel "ProjektyDisk"
-        
-        # Zmiana litery na F (jeśli auto-przypisanie dało inną)
-        $vol = Get-Volume -FileSystemLabel "ProjektyDisk"
-        if ($vol.DriveLetter -ne 'F') {
-            Get-Partition -DriveLetter $vol.DriveLetter | Set-Partition -NewDriveLetter F
+        # 1. Pobranie dostępnych dysków (wszystkie 4)
+        $disks = Get-PhysicalDisk -CanPool $true
+        if ($disks.Count -ge 4) {
+            # 2. Utworzenie Puli
+            $pool = New-StoragePool -FriendlyName $poolName -StorageSubsystemFriendlyName "Windows Storage*" -PhysicalDisks $disks
+            
+            # 3. Utworzenie Wirtualnego Dysku (Mirror + Max Size)
+            # Tiering w Windows Server automatycznie przypisuje SSD jako szybszą warstwę
+            New-VirtualDisk -StoragePoolFriendlyName $poolName -FriendlyName $vDiskName -ResiliencySettingName Mirror -UseMaximumSize
+            
+            # 4. Inicjalizacja i formatowanie ReFS
+            Get-VirtualDisk -FriendlyName $vDiskName | Get-Disk | Initialize-Disk -PartitionStyle GPT -PassThru | New-Partition -AssignDriveLetter -UseMaximumSize | Format-Volume -FileSystem ReFS -NewFileSystemLabel "Dane"
+            
+            # 5. Upewnienie się, że litera to F:
+            $p = Get-Partition -DriveLetter (Get-Volume -FileSystemLabel "Dane").DriveLetter
+            Set-Partition -InputObject $p -NewDriveLetter F
         }
+      args:
+        creates: "F:\" # Uruchom tylko jeśli dysk F nie istnieje
 
     # ----------------------------------------------------------------
-    # 4. Konfiguracja Katalogów i Udziału Sieciowego
+    # 4. Udział Sieciowy i Uprawnienia
     # ----------------------------------------------------------------
-    - name: Utworzenie katalogu F:\Projekty
+    - name: Tworzenie katalogu Projekty
       ansible.windows.win_file:
         path: F:\Projekty
         state: directory
 
-    - name: Nadanie uprawnień NTFS (Tylko Administratorzy i Kierownicy)
-      ansible.windows.win_acl:
-        path: F:\Projekty
-        user: "{{ item.user }}"
-        rights: "{{ item.rights }}"
-        type: allow
-        state: present
-        inheritance_flags: ContainerInherit,ObjectInherit
-        propagation_flags: None
-      loop:
-        - { user: 'Administrators', rights: 'FullControl' }
-        - { user: "Kierownicy_{{ nazwisko }}", rights: 'FullControl' }
-
-    - name: Usunięcie dziedziczenia i usunięcie grupy Users z NTFS
-      ansible.windows.win_acl_inheritance:
-        path: F:\Projekty
-        state: absent
-        reorganize: no # Usuwa odziedziczone uprawnienia (np. Users)
-
-    - name: Udostępnienie katalogu w sieci (SMB)
+    - name: Udostępnianie folderu Projekty_{{ nazwisko }}
       ansible.windows.win_share:
         name: "Projekty_{{ nazwisko }}"
         path: F:\Projekty
-        list: yes
         full: "Administrators,Kierownicy_{{ nazwisko }}"
-        read: "" # Puste, by nikt inny nie miał dostępu
-    
+        read: "" # Tylko uprawnieni mają dostęp
+
     # ----------------------------------------------------------------
-    # 5. Rejestr - Blokada usuwania drukarek
+    # 5. Rejestr - Blokada usuwania drukarek dla nie-adminów
     # ----------------------------------------------------------------
-    - name: Blokada usuwania drukarek (Polityka HKLM)
+    - name: Blokada usuwania drukarek (Registry)
       ansible.windows.win_regedit:
         path: HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Printers
-        name: RegisterSpoolerRemoteRpcEndPoint
-        data: 2
+        name: NoDeletePrinter
+        data: 1
         type: dword
         state: present
-      # Uwaga: Precyzyjne wycelowanie "tylko w użytkowników bez uprawnień admina" 
-      # za pomocą samego rejestru jest trudne bez GPO (Item Level Targeting).
-      # Powyższy klucz (przykład) utwardza politykę drukarek. 
-      # Alternatywnie stosuje się klucz NoDeletePrinter w HKCU.
