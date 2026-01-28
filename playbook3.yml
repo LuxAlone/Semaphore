@@ -5,7 +5,9 @@
 
   vars:
     backup_server: "Ansible_Zbojak"
+
     backup_path: "/backups/adguardhome"
+
     date: "{{ lookup('pipe', 'date +%Y-%m-%d') }}"
 
   tasks:
