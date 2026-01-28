@@ -8,10 +8,9 @@
 
   tasks:
     # ----------------------------------------------------------------
-    # 1. Instalacja Oprogramowania (Poprawiona nazwa modułu)
+    # 1. Instalacja Oprogramowania (Poprawione nazwy)
     # ----------------------------------------------------------------
     - name: Instalacja Chocolatey (jeśli nie istnieje)
-      # ZAMIAST ansible.windows.win_chocolatey UŻYJ:
       chocolatey.chocolatey.win_chocolatey:
         name: chocolatey
         state: present
@@ -23,7 +22,7 @@
       loop:
         - 7zip
         - firefox
-        - bind-tool-son-of-a-gun
+        - bind-tool # To jest poprawna nazwa pakietu dla 'dig'
 
     # ----------------------------------------------------------------
     # 2. Zarządzanie Użytkownikami i Grupami
