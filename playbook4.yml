@@ -15,14 +15,14 @@
         name: chocolatey
         state: present
 
-    - name: Instalacja aplikacji 7zip, Firefox i bind-tool (dig)
-      chocolatey.chocolatey.win_chocolatey:
+    - name: Instalacja aplikacji 7zip, Firefox i dig
+      chocolatey.chocolatey.win_chocolatey: # Zmieniona ścieżka modułu
         name: "{{ item }}"
         state: present
       loop:
         - 7zip
         - firefox
-        - bind-tool-son of a gun
+        - bind-tool
 
     # ----------------------------------------------------------------
     # 2. Zarządzanie Użytkownikami i Grupami
