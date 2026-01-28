@@ -71,10 +71,22 @@
         dest: "{{ adg_mount }}"
         remote_src: true
 
+    - name: Znalezienie katalogu AdGuardHome (install.sh)
+      find:
+        paths: "{{ adg_mount }}"
+        patterns: "install.sh"
+        file_type: file
+      register: adg_install
+
+    - name: Sprawdzenie czy znaleziono instalator
+      fail:
+        msg: "Nie znaleziono pliku install.sh w {{ adg_mount }}"
+      when: adg_install.matched == 0
+
     - name: Instalacja AdGuard Home
-      command: "{{ adg_mount }}/AdGuardHome/install.sh"
+      command: "{{ adg_install.files[0].path }}"
       args:
-        chdir: "{{ adg_mount }}/AdGuardHome"
+        chdir: "{{ adg_install.files[0].path | dirname }}"
 
     - name: Instalacja UFW
       apt:
