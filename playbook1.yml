@@ -27,7 +27,7 @@
         vg: "{{ adg_vg }}"
         pvs:
           - /dev/sdb
-          - /dev/sdc"
+          - /dev/sdc
 
     - name: Pobranie dostępnego rozmiaru VG
       command: vgdisplay -C --noheadings -o vg_free --units m --nosuffix {{ adg_vg }}
