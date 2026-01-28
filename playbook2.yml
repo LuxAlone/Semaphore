@@ -1,0 +1,25 @@
+---
+- name: Aktualizacja systemu operacyjnego
+  hosts: agh_zbojak
+  become: true
+
+  tasks:
+
+    - name: Aktualizacja listy pakietów
+      apt:
+        update_cache: yes
+
+    - name: Aktualizacja wszystkich pakietów
+      apt:
+        upgrade: dist
+        autoremove: yes
+        autoclean: yes
+
+    - name: Sprawdzenie czy wymagany jest restart
+      register: reboot_required
+      stat:
+        path: /var/run/reboot-required
+
+    - name: Restart systemu jeśli wymagany
+      reboot:
+      when: reboot_required.stat.exists
