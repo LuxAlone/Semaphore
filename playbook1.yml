@@ -4,7 +4,6 @@
   become: true
 
   vars:
-    adg_disk: "/dev/sdb"
     adg_vg: "adg_vg"
     adg_lv: "adg_lv"
     adg_mount: "/adguardhome"
@@ -13,15 +12,22 @@
 
   tasks:
 
-    - name: Tworzenie PV
-      command: pvcreate {{ adg_disk }}
+    - name: Tworzenie PV na sdb
+      command: pvcreate /dev/sdb
       args:
-        creates: "/dev/{{ adg_disk | basename }}"
+        creates: "/dev/sdb"
+
+    - name: Tworzenie PV na sdc
+      command: pvcreate /dev/sdc
+      args:
+        creates: "/dev/sdc"
 
     - name: Tworzenie VG
       lvg:
         vg: "{{ adg_vg }}"
-        pvs: "{{ adg_disk }}"
+        pvs:
+          - /dev/sdb
+          - /dev/sdc
 
     - name: Tworzenie LV RAID1
       lvol:
