@@ -8,21 +8,22 @@
 
   tasks:
     # ----------------------------------------------------------------
-    # 1. Instalacja Oprogramowania (Winget/Chocolatey)
+    # 1. Instalacja Oprogramowania (Poprawiona nazwa modułu)
     # ----------------------------------------------------------------
     - name: Instalacja Chocolatey (jeśli nie istnieje)
+      # ZAMIAST ansible.windows.win_chocolatey UŻYJ:
       chocolatey.chocolatey.win_chocolatey:
         name: chocolatey
         state: present
 
-    - name: Instalacja aplikacji 7zip, Firefox i dig
-      chocolatey.chocolatey.win_chocolatey: # Zmieniona ścieżka modułu
+    - name: Instalacja aplikacji 7zip, Firefox i bind-tool (dig)
+      chocolatey.chocolatey.win_chocolatey:
         name: "{{ item }}"
         state: present
       loop:
         - 7zip
         - firefox
-        - bind-tool
+        - bind-tool-son-of-a-gun
 
     # ----------------------------------------------------------------
     # 2. Zarządzanie Użytkownikami i Grupami
