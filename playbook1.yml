@@ -33,12 +33,12 @@
       command: vgdisplay -C --noheadings -o vg_free --units m --nosuffix {{ adg_vg }}
       register: vg_free
 
-    - name: Parsowanie rozmiaru VG (połowa dla RAID1)
+    - name: Parsowanie rozmiaru VG (95% połowy dla RAID1)
       set_fact:
-        vg_half_mb: "{{ (vg_free.stdout | trim | float / 2) | round(0) }}"
+        vg_safe_mb: "{{ ((vg_free.stdout | trim | float / 2) * 0.95) | round(0) }}"
 
     - name: Tworzenie LV RAID1
-      command: lvcreate -L {{ vg_half_mb }}M -m1 -n {{ adg_lv }} {{ adg_vg }}
+      command: lvcreate -L {{ vg_safe_mb }}M -m1 -n {{ adg_lv }} {{ adg_vg }}
       args:
         creates: "/dev/{{ adg_vg }}/{{ adg_lv }}"
 
