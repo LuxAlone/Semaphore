@@ -71,22 +71,46 @@
         dest: "{{ adg_mount }}"
         remote_src: true
 
-    - name: Znalezienie katalogu AdGuardHome (install.sh)
-      find:
-        paths: "{{ adg_mount }}"
-        patterns: "install.sh"
-        file_type: file
-      register: adg_install
+    - name: Instalacja binarki AdGuardHome
+      copy:
+        src: "{{ adg_mount }}/AdGuardHome/AdGuardHome"
+        dest: "/usr/local/bin/AdGuardHome"
+        mode: "0755"
+        remote_src: true
 
-    - name: Sprawdzenie czy znaleziono instalator
-      fail:
-        msg: "Nie znaleziono pliku install.sh w {{ adg_mount }}"
-      when: adg_install.matched == 0
+    - name: Tworzenie katalogów konfiguracyjnych
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - /etc/AdGuardHome
+        - /var/lib/AdGuardHome
 
-    - name: Instalacja AdGuard Home
-      command: "{{ adg_install.files[0].path }}"
-      args:
-        chdir: "{{ adg_install.files[0].path | dirname }}"
+    - name: Tworzenie usługi systemd
+      copy:
+        dest: /etc/systemd/system/adguardhome.service
+        content: |
+          [Unit]
+          Description=AdGuard Home
+          After=network.target
+
+          [Service]
+          Type=simple
+          ExecStart=/usr/local/bin/AdGuardHome -c /etc/AdGuardHome/AdGuardHome.yaml -w /var/lib/AdGuardHome
+          Restart=on-failure
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Reload systemd
+      command: systemctl daemon-reload
+
+    - name: Start AdGuard Home
+      systemd:
+        name: adguardhome
+        state: started
+        enabled: true
 
     - name: Instalacja UFW
       apt:
@@ -112,7 +136,7 @@
 
     - name: Włączenie UFW
       ufw:
-        state: enabled
+       state: enabled
 
     - name: Autostart UFW
       systemd:
