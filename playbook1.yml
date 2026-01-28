@@ -27,10 +27,18 @@
         vg: "{{ adg_vg }}"
         pvs:
           - /dev/sdb
-          - /dev/sdc
+          - /dev/sdc"
+
+    - name: Pobranie dostępnego rozmiaru VG
+      command: vgdisplay -C --noheadings -o vg_free --units m --nosuffix {{ adg_vg }}
+      register: vg_free
+
+    - name: Parsowanie rozmiaru VG
+      set_fact:
+        vg_free_mb: "{{ vg_free.stdout | trim | float | round(0) }}"
 
     - name: Tworzenie LV RAID1
-      command: lvcreate -L 100%FREE -m1 -n {{ adg_lv }} {{ adg_vg }}
+      command: lvcreate -L {{ vg_free_mb }}M -m1 -n {{ adg_lv }} {{ adg_vg }}
       args:
         creates: "/dev/{{ adg_vg }}/{{ adg_lv }}"
 
