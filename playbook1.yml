@@ -30,11 +30,9 @@
           - /dev/sdc
 
     - name: Tworzenie LV RAID1
-      lvol:
-        vg: "{{ adg_vg }}"
-        lv: "{{ adg_lv }}"
-        size: 100%FREE
-        type: raid1
+      command: lvcreate -L 100%FREE -m1 -n {{ adg_lv }} {{ adg_vg }}
+      args:
+        creates: "/dev/{{ adg_vg }}/{{ adg_lv }}"
 
     - name: Tworzenie systemu plików
       filesystem:
