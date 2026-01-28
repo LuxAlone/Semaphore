@@ -4,13 +4,10 @@
   become: true
 
   vars:
-    # Adres IP serwera backupowego
-    backup_server: "10.0.0.2"
+    backup_server: "10.0.0.3"
 
-    # Ścieżka docelowa na serwerze backupowym
     backup_path: "/backups/adguardhome"
 
-    # Data w formacie YYYY-MM-DD
     date: "{{ lookup('pipe', 'date +%Y-%m-%d') }}"
 
   tasks:
