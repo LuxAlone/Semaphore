@@ -7,7 +7,6 @@
     pass_default: "Student123!"
 
   tasks:
-    # 1. INSTALACJA APLIKACJI (Chocolatey)
     - name: Instalacja Chocolatey
       chocolatey.chocolatey.win_chocolatey:
         name: chocolatey
@@ -24,9 +23,8 @@
       chocolatey.chocolatey.win_chocolatey:
         name: bind-tool
         state: present
-      ignore_errors: yes # Na wypadek problemów z repozytorium
+      ignore_errors: yes
 
-    # 2. UŻYTKOWNICY I GRUPA
     - name: Utworzenie grupy Kierownicy
       ansible.windows.win_group:
         name: "Kierownicy_{{ nazwisko }}"
@@ -43,7 +41,6 @@
         - "Marek Romanek"
         - "Jacek Gula"
 
-    # 3. STORAGE POOL I ReFS (PowerShell)
     - name: Konfiguracja Puli Dyskowej i ReFS
       ansible.windows.win_shell: |
         $disks = Get-PhysicalDisk -CanPool $true
@@ -58,7 +55,6 @@
       args:
         creates: "F:\"
 
-    # 4. UDZIAŁ SIECIOWY I UPRAWNIENIA (Naprawiona składnia)
     - name: Tworzenie katalogu Projekty
       ansible.windows.win_file:
         path: F:\Projekty
@@ -70,7 +66,6 @@
         path: F:\Projekty
         full: "Administrators, Kierownicy_{{ nazwisko }}"
 
-    # 5. REJESTR - BLOKADA USUWANIA DRUKAREK
     - name: Blokada usuwania drukarek dla nie-adminów
       ansible.windows.win_regedit:
         path: HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Printers
