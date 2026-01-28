@@ -5,9 +5,7 @@
 
   vars:
     backup_server: "Ansible_Zbojak"
-
     backup_path: "/backups/adguardhome"
-
     date: "{{ lookup('pipe', 'date +%Y-%m-%d') }}"
 
   tasks:
@@ -18,11 +16,17 @@
         state: directory
         mode: "0755"
 
-    - name: Kopiowanie konfiguracji AdGuard Home
+    - name: Sprawdzenie czy istnieje plik konfiguracyjny
+      stat:
+        path: "/etc/AdGuardHome/AdGuardHome.yaml"
+      register: adg_conf
+
+    - name: Kopiowanie konfiguracji AdGuard Home (jeśli istnieje)
       copy:
         src: "/etc/AdGuardHome/AdGuardHome.yaml"
         dest: "/tmp/adguard_backup_{{ date }}/AdGuardHome.yaml"
         remote_src: true
+      when: adg_conf.stat.exists
 
     - name: Archiwizacja danych AdGuard Home
       archive:
