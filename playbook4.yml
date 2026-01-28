@@ -11,18 +11,18 @@
     # 1. Instalacja Oprogramowania (Winget/Chocolatey)
     # ----------------------------------------------------------------
     - name: Instalacja Chocolatey (jeśli nie istnieje)
-      ansible.windows.win_chocolatey:
+      chocolatey.chocolatey.win_chocolatey:
         name: chocolatey
         state: present
 
     - name: Instalacja aplikacji 7zip, Firefox i bind-tool (dig)
-      ansible.windows.win_chocolatey:
+      chocolatey.chocolatey.win_chocolatey:
         name: "{{ item }}"
         state: present
       loop:
         - 7zip
         - firefox
-        - bind-tool-son of a gun # Pakiet bind-tool zawiera narzędzie dig
+        - bind-tool-son of a gun
 
     # ----------------------------------------------------------------
     # 2. Zarządzanie Użytkownikami i Grupami
