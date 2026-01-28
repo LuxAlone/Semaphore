@@ -1,0 +1,97 @@
+---
+- name: Instalacja i konfiguracja AdGuard Home
+  hosts: agh_zbojak
+  become: true
+
+  vars:
+    adg_disk: "/dev/sdb"
+    adg_vg: "adg_vg"
+    adg_lv: "adg_lv"
+    adg_mount: "/adguardhome"
+    adg_url: "https://static.adguard.com/adguardhome/release/AdGuardHome_linux_amd64.tar.gz"
+    adg_port: 3000
+
+  tasks:
+
+    - name: Tworzenie PV
+      command: pvcreate {{ adg_disk }}
+      args:
+        creates: "/dev/{{ adg_disk | basename }}"
+
+    - name: Tworzenie VG
+      lvg:
+        vg: "{{ adg_vg }}"
+        pvs: "{{ adg_disk }}"
+
+    - name: Tworzenie LV RAID1
+      lvol:
+        vg: "{{ adg_vg }}"
+        lv: "{{ adg_lv }}"
+        size: 100%FREE
+        type: raid1
+
+    - name: Tworzenie systemu plików
+      filesystem:
+        fstype: ext4
+        dev: "/dev/{{ adg_vg }}/{{ adg_lv }}"
+
+    - name: Tworzenie katalogu montowania
+      file:
+        path: "{{ adg_mount }}"
+        state: directory
+        mode: "0755"
+
+    - name: Montowanie woluminu
+      mount:
+        path: "{{ adg_mount }}"
+        src: "/dev/{{ adg_vg }}/{{ adg_lv }}"
+        fstype: ext4
+        state: mounted
+
+    - name: Pobranie AdGuard Home
+      get_url:
+        url: "{{ adg_url }}"
+        dest: "/tmp/adguard.tar.gz"
+
+    - name: Rozpakowanie AdGuard Home
+      unarchive:
+        src: "/tmp/adguard.tar.gz"
+        dest: "{{ adg_mount }}"
+        remote_src: true
+
+    - name: Instalacja AdGuard Home
+      command: "{{ adg_mount }}/AdGuardHome/install.sh"
+      args:
+        chdir: "{{ adg_mount }}/AdGuardHome"
+
+    - name: Instalacja UFW
+      apt:
+        name: ufw
+        state: present
+        update_cache: yes
+
+    - name: Reset UFW
+      ufw:
+        state: reset
+
+    - name: Zezwolenie na SSH
+      ufw:
+        rule: allow
+        port: 22
+        proto: tcp
+
+    - name: Zezwolenie na AdGuard Home
+      ufw:
+        rule: allow
+        port: "{{ adg_port }}"
+        proto: tcp
+
+    - name: Włączenie UFW
+      ufw:
+        state: enabled
+
+    - name: Autostart UFW
+      systemd:
+        name: ufw
+        enabled: true
+        state: started
